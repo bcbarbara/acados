@@ -65,7 +65,7 @@ typedef enum
 {
     LINEAR_LS,
     NONLINEAR_LS,
-    EXTERNAL,
+    EXTERNALLY_PROVIDED,
     INVALID_COST,
 } ocp_nlp_cost_t;
 
@@ -88,7 +88,7 @@ typedef enum
 
     /// Comprises simple bounds, polytopic constraints,
     /// general non-linear constraints, and positive definite constraints.
-    BGP,
+    BGHP,
 
     INVALID_CONSTRAINT,
 } ocp_nlp_constraints_t;
@@ -279,15 +279,9 @@ void ocp_nlp_out_set(ocp_nlp_config *config, ocp_nlp_dims *dims, ocp_nlp_out *ou
 void ocp_nlp_out_get(ocp_nlp_config *config, ocp_nlp_dims *dims, ocp_nlp_out *out,
         int stage, const char *field, void *value);
 //
-// TODO(andrea): remove this once/if the MATLAB interface uses the new setters below?
 int ocp_nlp_dims_get_from_attr(ocp_nlp_config *config, ocp_nlp_dims *dims, ocp_nlp_out *out,
         int stage, const char *field);
 
-void ocp_nlp_constraint_dims_get_from_attr(ocp_nlp_config *config, ocp_nlp_dims *dims, ocp_nlp_out *out,
-        int stage, const char *field, int *dims_out);
-
-void ocp_nlp_cost_dims_get_from_attr(ocp_nlp_config *config, ocp_nlp_dims *dims, ocp_nlp_out *out,
-        int stage, const char *field, int *dims_out);
 /* opts */
 
 /// Creates an options struct for the non-linear program.
@@ -368,7 +362,8 @@ void ocp_nlp_get(ocp_nlp_config *config, ocp_nlp_solver *solver,
 /// Sets the initial guesses for the integrator for the given stage.
 ///
 /// \param config The configuration struct.
-/// \param solver The ocp_nlp_solver struct.
+/// \param dims The dimension struct.
+/// \param mem The memory struct.
 /// \param stage Stage number.
 /// \param field Supports "z_guess", "xdot_guess" (IRK), "phi_guess" (GNSF-IRK)
 /// \param value The initial guess for the algebraic variables in the integrator (if continuous model is used).

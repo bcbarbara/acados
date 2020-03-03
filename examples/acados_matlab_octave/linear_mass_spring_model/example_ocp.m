@@ -74,7 +74,7 @@ sim_method_num_stages = 4;
 sim_method_num_steps = 3;
 %cost_type = 'linear_ls';
 %cost_type = 'nonlinear_ls';
-cost_type = 'auto';
+cost_type = 'ext_cost';
 
 
 
@@ -89,23 +89,18 @@ nx = model.nx;
 nu = model.nu;
 ny = nu+nx; % number of outputs in lagrange term
 ny_e = nx; % number of outputs in mayer term
-
-% constraint formulation
-if 1
-    % bounds on x and u
+if 0
 	nbx = nx/2;
 	nbu = nu;
 	ng = 0;
 	nh = 0;
 elseif 0
-    % general linear constraints on x and u
 	nbx = 0;
 	nbu = 0;
 	ng = nu+nx/2;
 	ng_e = nx;
 	nh = 0;
 else
-    % external function constraint
 	nbx = 0;
 	nbu = 0;
 	ng = 0;

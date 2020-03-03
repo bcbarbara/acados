@@ -31,20 +31,18 @@
 # POSSIBILITY OF SUCH DAMAGE.;
 #
 
-import os
+
 from casadi import *
-from .utils import ALLOWED_CASADI_VERSIONS, is_empty, casadi_length
+import os
 
 def generate_c_code_implicit_ode( model, opts ):
 
     casadi_version = CasadiMeta.version()
-    casadi_opts = dict(mex=False, casadi_int='int', casadi_real='double')
-    if casadi_version not in (ALLOWED_CASADI_VERSIONS):
-        msg =  'Please download and install CasADi {} '.format(" or ".join(ALLOWED_CASADI_VERSIONS))
-        msg += 'to ensure compatibility with acados.\n'
-        msg += 'Version {} currently in use.'.format(casadi_version)
-        raise Exception(msg)
+    if  casadi_version not in ('3.4.5', '3.4.0'):
+        # old casadi versions
+        raise Exception('Please download and install Casadi 3.4.0 to ensure compatibility with acados. Version ' + casadi_version + ' currently in use.')
 
+    casadi_opts = dict(mex=False, casadi_int='int', casadi_real='double')
     generate_hess = opts["generate_hess"]
 
     ## load model
@@ -56,30 +54,28 @@ def generate_c_code_implicit_ode( model, opts ):
     f_impl = model.f_impl_expr
     model_name = model.name
 
-    if isinstance(x, casadi.SX):
-        is_SX = True
-    elif isinstance(x, casadi.MX):
-        is_SX = False
+    ## get model dimensions
+    nx = x.size()[0]
+    nu = u.size()[0]
+    if type(z) is list:
+        # check that z is empty
+        if len(z) == 0:
+            nz = 0
+            z  = SX.sym('z', 0, 0) 
+        else:
+            raise Exception('z is a non-empty list. It should be either an empty list or an SX object.')
     else:
-        raise Exception("model.x must be casadi.SX or casadi.MX, got {}".format(type(x)))
+        nz = z.size()[0]
 
-
-    if is_empty(p):
-        if is_SX:
+    if type(p) is list:
+        # check that z is empty
+        if len(p) == 0:
+            np = 0
             p = SX.sym('p', 0, 0)
         else:
-            p = MX.sym('p', 0, 0)
-
-    if is_empty(z):
-        if is_SX:
-            z = SX.sym('z', 0, 0)
-        else:
-            z = MX.sym('z', 0, 0)
-
-    ## get model dimensions
-    nx = casadi_length(x)
-    nu = casadi_length(u)
-    nz = casadi_length(z)
+            raise Exception('p is a non-empty list. It should be either an empty list or an SX object.')
+    else:
+        np = p.size()[0]
 
     ## generate jacobians
     jac_x       = jacobian(f_impl, x)
@@ -90,14 +86,14 @@ def generate_c_code_implicit_ode( model, opts ):
     ## generate hessian
     x_xdot_z_u = vertcat(x, xdot, z, u)
 
-    if isinstance(x,casadi.SX):
+    if type(x[0]) == casadi.SX:
         multiplier  = SX.sym('multiplier', nx + nz)
         multiply_mat  = SX.sym('multiply_mat', 2*nx+nz+nu, nx + nu)
         HESS = SX.zeros( x_xdot_z_u.size()[0], x_xdot_z_u.size()[0])
-    elif isinstance(x,casadi.MX):
+    elif type(x[0]) == casadi.MX:
         multiplier  = MX.sym('multiplier', nx + nz)
         multiply_mat  = MX.sym('multiply_mat', 2*nx+nz+nu, nx + nu)
-        HESS = MX.zeros( x_xdot_z_u.size()[0], x_xdot_z_u.size()[0])
+        HESS = MX.zeros( x_xdot_z_u.size()[0], x_xdot_z_u,size()[0])
 
     for ii in range(f_impl.size()[0]):
         jac_x_xdot_z = jacobian(f_impl[ii], x_xdot_z_u)
@@ -121,7 +117,7 @@ def generate_c_code_implicit_ode( model, opts ):
 
     # fun_name = model_name + '_impl_dae_jac_x_xdot_u'
     # impl_dae_jac_x_xdot_u = Function(fun_name, [x, xdot, u, z, p], [jac_x, jac_xdot, jac_u, jac_z])
-
+    
     fun_name = model_name + '_impl_dae_fun_jac_x_xdot_u_z'
     impl_dae_fun_jac_x_xdot_u_z = Function(fun_name, [x, xdot, u, z, p], [f_impl, jac_x, jac_xdot, jac_u, jac_z])
 
@@ -131,7 +127,7 @@ def generate_c_code_implicit_ode( model, opts ):
     fun_name = model_name + '_impl_dae_jac_x_xdot_u_z'
     impl_dae_jac_x_xdot_u_z = Function(fun_name, [x, xdot, u, z, p], [jac_x, jac_xdot, jac_u, jac_z])
 
-
+    
     fun_name = model_name + '_impl_dae_hess'
     impl_dae_hess = Function(fun_name, [x, xdot, u, z, multiplier, multiply_mat, p], [HESS_multiplied])
 
@@ -151,7 +147,7 @@ def generate_c_code_implicit_ode( model, opts ):
 
     fun_name = model_name + '_impl_dae_fun_jac_x_xdot_z'
     impl_dae_fun_jac_x_xdot_z.generate(fun_name, casadi_opts)
-
+    
     fun_name = model_name + '_impl_dae_jac_x_xdot_u_z'
     impl_dae_jac_x_xdot_u_z.generate(fun_name, casadi_opts)
 

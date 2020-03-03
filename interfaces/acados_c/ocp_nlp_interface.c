@@ -48,7 +48,7 @@
 #include "acados/ocp_nlp/ocp_nlp_dynamics_cont.h"
 #include "acados/ocp_nlp/ocp_nlp_dynamics_disc.h"
 #include "acados/ocp_nlp/ocp_nlp_constraints_bgh.h"
-#include "acados/ocp_nlp/ocp_nlp_constraints_bgp.h"
+#include "acados/ocp_nlp/ocp_nlp_constraints_bghp.h"
 #include "acados/ocp_nlp/ocp_nlp_reg_convexify.h"
 #include "acados/ocp_nlp/ocp_nlp_reg_mirror.h"
 #include "acados/ocp_nlp/ocp_nlp_reg_project.h"
@@ -236,7 +236,7 @@ ocp_nlp_config *ocp_nlp_config_create(ocp_nlp_plan plan)
             case NONLINEAR_LS:
                 ocp_nlp_cost_nls_config_initialize_default(config->cost[i]);
                 break;
-            case EXTERNAL:
+            case EXTERNALLY_PROVIDED:
                 ocp_nlp_cost_external_config_initialize_default(config->cost[i]);
                 break;
             case INVALID_COST:
@@ -300,8 +300,8 @@ ocp_nlp_config *ocp_nlp_config_create(ocp_nlp_plan plan)
             case BGH:
                 ocp_nlp_constraints_bgh_config_initialize_default(config->constraints[i]);
                 break;
-            case BGP:
-                ocp_nlp_constraints_bgp_config_initialize_default(config->constraints[i]);
+            case BGHP:
+                ocp_nlp_constraints_bghp_config_initialize_default(config->constraints[i]);
                 break;
             case INVALID_CONSTRAINT:
                 printf("\nerror: ocp_nlp_config_create: forgot to initialize plan->nlp_constraints\n");
@@ -541,13 +541,6 @@ int ocp_nlp_dims_get_from_attr(ocp_nlp_config *config, ocp_nlp_dims *dims, ocp_n
     {
         return dims->nz[stage];
     }
-    // ocp nlp dynamics
-    else if (!strcmp(field, "init_gnsf_phi"))
-    {
-        config->dynamics[stage]->dims_get(config->dynamics[stage], dims->dynamics[stage],
-                                                    "gnsf_nout", &dims_value);
-        return dims_value;
-    }
     // ocp_nlp_constraints_dims
     else if (!strcmp(field, "lbx") || !strcmp(field, "ubx"))
     {
@@ -587,145 +580,6 @@ int ocp_nlp_dims_get_from_attr(ocp_nlp_config *config, ocp_nlp_dims *dims, ocp_n
     }
 }
 
-
-void ocp_nlp_constraint_dims_get_from_attr(ocp_nlp_config *config, ocp_nlp_dims *dims, ocp_nlp_out *out,
-        int stage, const char *field, int *dims_out)
-{
-    // vectors first
-    dims_out[1] = 0; 
-    // ocp_nlp_constraints_dims
-    if (!strcmp(field, "lbx") || !strcmp(field, "ubx"))
-    {
-        config->constraints[stage]->dims_get(config->constraints[stage], dims->constraints[stage],
-                                            "nbx", &dims_out[0]);
-        return;
-    }
-    else if (!strcmp(field, "lbu") || !strcmp(field, "ubu"))
-    {
-        config->constraints[stage]->dims_get(config->constraints[stage], dims->constraints[stage],
-                                            "nbu", &dims_out[0]);
-        return;
-    }
-    else if (!strcmp(field, "lg") || !strcmp(field, "ug"))
-    {
-        config->constraints[stage]->dims_get(config->constraints[stage], dims->constraints[stage],
-                                            "ng", &dims_out[0]);
-        return;
-    }
-    else if (!strcmp(field, "lh") || !strcmp(field, "uh"))
-    {
-        config->constraints[stage]->dims_get(config->constraints[stage], dims->constraints[stage],
-                                            "nh", &dims_out[0]);
-        return;
-    }
-    // matrices
-    else if (!strcmp(field, "C"))
-    {
-        config->constraints[stage]->dims_get(config->constraints[stage], dims->constraints[stage],
-                "ng", &dims_out[0]);
-
-        dims_out[1] = dims->nx[stage];
-
-        return;
-    }
-    else if (!strcmp(field, "D"))
-    {
-        config->constraints[stage]->dims_get(config->constraints[stage], dims->constraints[stage],
-                "ng", &dims_out[0]);
-
-        dims_out[1] = dims->nu[stage];
-
-        return;
-    }
-    else
-    {
-        printf("\nerror: ocp_nlp_constraint_dims_get_from_attr: field %s not available\n", field);
-        exit(1);
-    }
-}
-
-void ocp_nlp_cost_dims_get_from_attr(ocp_nlp_config *config, ocp_nlp_dims *dims, ocp_nlp_out *out,
-        int stage, const char *field, int *dims_out)
-{
-    // vectors first
-    dims_out[1] = 0; 
-    if (!strcmp(field, "y_ref") || !strcmp(field, "yref"))
-    {
-        config->cost[stage]->dims_get(config->cost[stage], dims->cost[stage],
-                                            "ny", &dims_out[0]);
-    }
-    else if (!strcmp(field, "Zl"))
-    {
-
-        dims_out[0] = dims->ns[stage];
-
-        return;
-    }
-    else if (!strcmp(field, "Zu"))
-    {
-
-        dims_out[0] = dims->ns[stage];
-
-        return;
-    }
-    else if (!strcmp(field, "zl"))
-    {
-
-        dims_out[0] = dims->ns[stage];
-
-        return;
-    }
-    else if (!strcmp(field, "zu"))
-    {
-
-        dims_out[0] = dims->ns[stage];
-
-        return;
-    }
-    // matrices
-    else if (!strcmp(field, "W"))
-    {
-
-        config->cost[stage]->dims_get(config->cost[stage], dims->cost[stage],
-                                            "ny", &dims_out[0]);
-
-        config->cost[stage]->dims_get(config->cost[stage], dims->cost[stage],
-                                            "ny", &dims_out[1]);
-        return;
-    }
-    else if (!strcmp(field, "Vx"))
-    {
-
-        config->cost[stage]->dims_get(config->cost[stage], dims->cost[stage],
-                                            "ny", &dims_out[0]);
-        dims_out[1] = dims->nx[stage];
-
-        return;
-    }
-    else if (!strcmp(field, "Vu"))
-    {
-
-        config->cost[stage]->dims_get(config->cost[stage], dims->cost[stage],
-                                            "ny", &dims_out[0]);
-        dims_out[1] = dims->nu[stage];
-
-        return;
-    }
-    else if (!strcmp(field, "Vz"))
-    {
-
-        config->cost[stage]->dims_get(config->cost[stage], dims->cost[stage],
-                                            "ny", &dims_out[0]);
-        dims_out[1] = dims->nz[stage];
-
-        return;
-    }
-    else
-    {
-        printf("\nerror: ocp_nlp_cost_dims_get_from_attr: field %s not available\n", field);
-        exit(1);
-    }
-}
 
 /************************************************
 * opts

@@ -49,7 +49,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     long long *ptr;
     char fun_name[50] = "ocp_get";
-    char buffer [300]; // for error messages
+    char buffer [200]; // for error messages
 
     int ii, jj;
 
@@ -78,29 +78,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // field
     char *field = mxArrayToString( prhs[1] );
-    // mexPrintf("\nin ocp_get: field%s\n", field);
+//    mexPrintf("\nin ocp_get: field%s\n", field);
 
     int N = dims->N;
     int nu = dims->nu[0];
     int nx = dims->nx[0];
     int nz = dims->nz[0];
-
-    int stage;
-
-    if (nrhs==3)
-    {
-        stage = mxGetScalar( prhs[2] );
-        if (stage < 0 || stage > N)
-        {
-            sprintf(buffer, "\nocp_get: invalid stage index, got %d\n", stage);
-            mexErrMsgTxt(buffer);
-        }
-        else if (stage == N && strcmp(field, "x") && strcmp(field, "sens_x") )
-        {
-            sprintf(buffer, "\nocp_get: invalid stage index, got %d = N, only x available at this stage\n", stage);
-            mexErrMsgTxt(buffer);
-        }
-    }
 
     if (!strcmp(field, "x"))
     {
@@ -117,6 +100,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         {
             plhs[0] = mxCreateNumericMatrix(nx, 1, mxDOUBLE_CLASS, mxREAL);
             double *x = mxGetPr( plhs[0] );
+            int stage = mxGetScalar( prhs[2] );
             ocp_nlp_out_get(config, dims, out, stage, "x", x);
         }
         else
@@ -140,6 +124,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         {
             plhs[0] = mxCreateNumericMatrix(nu, 1, mxDOUBLE_CLASS, mxREAL);
             double *u = mxGetPr( plhs[0] );
+            int stage = mxGetScalar( prhs[2] );
             ocp_nlp_out_get(config, dims, out, stage, "u", u);
         }
         else
@@ -163,6 +148,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         {
             plhs[0] = mxCreateNumericMatrix(nz, 1, mxDOUBLE_CLASS, mxREAL);
             double *z = mxGetPr( plhs[0] );
+            int stage = mxGetScalar( prhs[2] );
             ocp_nlp_out_get(config, dims, out, stage, "z", z);
         }
         else
@@ -186,6 +172,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         {
             plhs[0] = mxCreateNumericMatrix(nx, 1, mxDOUBLE_CLASS, mxREAL);
             double *pi = mxGetPr( plhs[0] );
+            int stage = mxGetScalar( prhs[2] );
             ocp_nlp_out_get(config, dims, out, stage, "pi", pi);
         }
         else
@@ -209,6 +196,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         {
             plhs[0] = mxCreateNumericMatrix(nx, 1, mxDOUBLE_CLASS, mxREAL);
             double *x = mxGetPr( plhs[0] );
+            int stage = mxGetScalar( prhs[2] );
             ocp_nlp_out_get(config, dims, sens_out, stage, "x", x);
         }
         else
@@ -232,6 +220,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         {
             plhs[0] = mxCreateNumericMatrix(nu, 1, mxDOUBLE_CLASS, mxREAL);
             double *u = mxGetPr( plhs[0] );
+            int stage = mxGetScalar( prhs[2] );
             ocp_nlp_out_get(config, dims, sens_out, stage, "u", u);
         }
         else
@@ -255,6 +244,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         {
             plhs[0] = mxCreateNumericMatrix(nx, 1, mxDOUBLE_CLASS, mxREAL);
             double *pi = mxGetPr( plhs[0] );
+            int stage = mxGetScalar( prhs[2] );
             ocp_nlp_out_get(config, dims, sens_out, stage, "pi", pi);
         }
         else
@@ -303,20 +293,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         double *mat_ptr = mxGetPr( plhs[0] );
         ocp_nlp_get(config, solver, "time_qp_sol", mat_ptr);
     }
-    else if (!strcmp(field, "time_qp_solver_call"))
-    {
-        plhs[0] = mxCreateNumericMatrix(1, 1, mxDOUBLE_CLASS, mxREAL);
-        double *mat_ptr = mxGetPr( plhs[0] );
-        ocp_nlp_get(config, solver, "time_qp_solver_call", mat_ptr);
-    }
-    else if (!strcmp(field, "qp_iter"))
-    {
-        plhs[0] = mxCreateNumericMatrix(1, 1, mxDOUBLE_CLASS, mxREAL);
-        double *mat_ptr = mxGetPr( plhs[0] );
-        int qp_iter;
-        ocp_nlp_get(config, solver, "qp_iter", &qp_iter);
-        *mat_ptr = (double) qp_iter;
-   }
     else if (!strcmp(field, "stat"))
     {
         int sqp_iter;
@@ -336,7 +312,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 mat_ptr[ii+(jj+1)*min_size] = stat[jj+ii*stat_n];
         }
     }
-    else if (!strcmp(field, "qp_solver_cond_H"))
+    else if (!strcmp(field, "qp_solver_H"))
     {
 		void *qp_in_;
         ocp_nlp_get(config, solver, "qp_xcond_in", &qp_in_);
@@ -354,8 +330,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		{
 			ocp_qp_in *qp_in = qp_in_;
 			int N = qp_in->dim->N;
-			int *nu = qp_in->dim->nu;
-			int *nx = qp_in->dim->nx;
+			int *nu = qp_in->dim->nx;
+			int *nx = qp_in->dim->nu;
 
 			mxArray *cell_array = mxCreateCellMatrix(N+1, 1);
 			plhs[0] = cell_array;
@@ -382,37 +358,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		}
 		else
 		{
-			mexPrintf("\nerror: ocp_get: qp_solver_cond_H: unsupported solver\n");
+			mexPrintf("\nerror: ocp_get: qp_solver_H: unsupported solver\n");
 			exit(1);
-		}
-	}
-    else if (!strcmp(field, "qp_solver_A"))
-    {
-		ocp_qp_in *qp_in;
-        ocp_nlp_get(config, solver, "qp_in", &qp_in);
-
-		int N = qp_in->dim->N;
-		int *nu = qp_in->dim->nu;
-		int *nx = qp_in->dim->nx;
-
-		mxArray *cell_array = mxCreateCellMatrix(N, 1);
-		plhs[0] = cell_array;
-
-		mxArray *tmp_mat;
-
-		for (ii=0; ii<N; ii++)
-		{
-			tmp_mat = mxCreateNumericMatrix(nx[ii+1], nx[ii], mxDOUBLE_CLASS, mxREAL);
-			double *mat_ptr = mxGetPr( tmp_mat );
-			blasfeo_unpack_tran_dmat(nx[ii], nx[ii+1], qp_in->BAbt+ii, nu[ii], 0, mat_ptr, nx[ii+1]);
-
-			mxSetCell(cell_array, ii, tmp_mat);
 		}
 	}
     else
     {
         MEX_FIELD_NOT_SUPPORTED_SUGGEST(fun_name, field,
-             "x, u, z, pi, sens_x, sens_u, sens_pi, status, sqp_iter, time_tot, time_lin, time_reg, time_qp_sol, stat, qp_solver_cond_H, qp_solver_A");
+             "x, u, z, pi, sens_x, sens_u, sens_pi, status, sqp_iter, time_tot, time_lin, time_reg, time_qp_sol, stat, qp_solver_H");
     }
 
     return;

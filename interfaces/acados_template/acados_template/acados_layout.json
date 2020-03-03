@@ -2,17 +2,41 @@
     "acados_include_path": [
         "str"
     ],
-    "model": {
+    "con_h": {
+        "name"   : [
+            "str"
+            ]   
+    },
+    "con_h_e": {
+        "name": [
+            "str"
+            ]   
+    },
+    "con_p_e": {
+        "name" : [
+            "str"
+        ]
+     },
+     "cost_r": {
          "name" : [
             "str"
         ]
     },
-    "parameter_values": [
-        "ndarray",
-        [
-            "np"
+    "cost_r_e": {
+        "name" : [
+            "str"
         ]
-    ],
+     },
+     "con_p": {
+         "name" : [
+            "str"
+        ]
+    },
+     "model": {
+         "name" : [
+            "str"
+        ]
+    },
     "acados_lib_path": [
         "str"
     ],
@@ -73,27 +97,9 @@
         ],
         "idxbx_e": [
             "ndarray",
-            [
-                "nbx_e"
-            ]
-        ],
-        "lbx_0": [
-            "ndarray",
-            [
-                "nbx_0"
-            ]
-        ],
-        "ubx_0": [
-            "ndarray",
-            [
-                "nbx_0"
-            ]
-        ],
-        "idxbx_0": [
-            "ndarray",
-            [
-                "nbx_0"
-            ]
+                    [
+                        "nbx_e"
+                    ]
         ],
         "lg": [
             "ndarray",
@@ -162,30 +168,6 @@
             "ndarray",
             [
                 "nh_e"
-            ]
-        ],
-        "lphi": [
-            "ndarray",
-            [
-                "nphi"
-            ]
-        ],
-        "uphi": [
-            "ndarray",
-            [
-                "nphi"
-            ]
-        ],
-        "lphi_e": [
-            "ndarray",
-            [
-                "nphi_e"
-            ]
-        ],
-        "uphi_e": [
-            "ndarray",
-            [
-                "nphi_e"
             ]
         ],
         "lsbx": [
@@ -278,40 +260,16 @@
                 "nsh_e"
             ]
         ],
-        "lsphi": [
+        "p": [
             "ndarray",
             [
-                "nsphi"
+                "np"
             ]
         ],
-        "usphi": [
+        "x0": [
             "ndarray",
             [
-                "nsphi"
-            ]
-        ],
-        "idxsphi": [
-            "ndarray",
-            [
-                "nsphi"
-            ]
-        ],
-        "lsphi_e": [
-            "ndarray",
-            [
-                "nsphi_e"
-            ]
-        ],
-        "usphi_e": [
-            "ndarray",
-            [
-                "nsphi_e"
-            ]
-        ],
-        "idxsphi_e": [
-            "ndarray",
-            [
-                "nsphi_e"
+                "nx"
             ]
         ]
     },
@@ -360,12 +318,14 @@
         "Zl": [
             "ndarray",
             [
+                "ns",
                 "ns"
             ]
         ],
         "Zu": [
             "ndarray",
             [
+                "ns",
                 "ns"
             ]
         ],
@@ -403,12 +363,14 @@
         "Zl_e": [
             "ndarray",
             [
+                "ns_e",
                 "ns_e"
             ]
         ],
         "Zu_e": [
             "ndarray",
             [
+                "ns_e",
                 "ns_e"
             ]
         ],
@@ -444,9 +406,6 @@
         "nsbx_e": [
             "int"
         ],
-        "nbx_0": [
-            "int"
-        ],
         "nbx_e": [
             "int"
         ],
@@ -454,12 +413,6 @@
             "int"
         ],
         "nsh_e": [
-            "int"
-        ],
-        "nsphi": [
-            "int"
-        ],
-        "nsphi_e": [
             "int"
         ],
         "ns": [
@@ -474,25 +427,19 @@
         "ng_e": [
             "int"
         ],
-        "np": [
-            "int"
-        ],
-        "nr": [
-            "int"
-        ],
-        "nr_e": [
-            "int"
-        ],
         "nh": [
             "int"
         ],
         "nh_e": [
             "int"
         ],
-        "nphi": [
+        "np": [
             "int"
         ],
-        "nphi_e": [
+        "npd": [
+            "int"
+        ],
+        "npd_e": [
             "int"
         ],
         "nu": [
@@ -509,24 +456,9 @@
         ],
         "nz": [
             "int"
-        ],
-        "gnsf_nx1": [
-            "int"
-        ],
-        "gnsf_nz1": [
-            "int"
-        ],
-        "gnsf_nuhat": [
-            "int"
-        ],
-        "gnsf_ny": [
-            "int"
-        ],
-        "gnsf_nout": [
-            "int"
         ]
     },
-    "solver_options": {
+    "solver_config": {
         "hessian_approx": [
             "str"
         ],
@@ -536,16 +468,10 @@
         "nlp_solver_type": [
             "str"
         ],
-        "nlp_solver_step_length": [
-            "float"
-        ],
         "qp_solver": [
             "str"
         ],
         "tf": [
-            "float"
-        ],
-        "Tsim": [
             "float"
         ],
         "sim_method_num_stages": [
@@ -553,51 +479,6 @@
         ],
         "sim_method_num_steps": [
             "int"
-        ],
-        "sim_method_newton_iter": [
-            "int"
-        ],
-        "qp_solver_cond_N": [
-            "int"
-        ],
-        "qp_solver_tol_stat": [
-            "float"
-        ],
-        "qp_solver_tol_eq": [
-            "float"
-        ],
-        "qp_solver_tol_ineq": [
-            "float"
-        ],
-        "qp_solver_tol_comp": [
-            "float"
-        ],
-        "qp_solver_iter_max": [
-            "int"
-        ],
-        "nlp_solver_tol_stat": [
-            "float"
-        ],
-        "nlp_solver_tol_eq": [
-            "float"
-        ],
-        "nlp_solver_tol_ineq": [
-            "float"
-        ],
-        "nlp_solver_tol_comp": [
-            "float"
-        ],
-        "nlp_solver_max_iter": [
-            "int"
-        ],
-        "print_level": [
-            "int"
-        ],
-        "model_external_shared_lib_dir": [
-            "str"
-        ],
-        "model_external_shared_lib_name": [
-            "str"
         ]
     }
 }

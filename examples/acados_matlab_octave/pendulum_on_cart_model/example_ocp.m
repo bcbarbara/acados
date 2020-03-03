@@ -71,7 +71,7 @@ qp_solver = 'partial_condensing_hpipm';
 qp_solver_cond_N = 5;
 qp_solver_cond_ric_alg = 0;
 qp_solver_ric_alg = 0;
-qp_solver_warm_start = 2;
+qp_solver_warm_start = 0;
 qp_solver_max_iter = 100;
 %sim_method = 'erk';
 sim_method = 'irk';
@@ -225,15 +225,13 @@ if (strcmp(nlp_solver, 'sqp'))
 	ocp_opts.set('nlp_solver_tol_comp', nlp_solver_tol_comp);
 end
 ocp_opts.set('qp_solver', qp_solver);
+if (strcmp(qp_solver, 'partial_condensing_hpipm'))
+	ocp_opts.set('qp_solver_cond_N', qp_solver_cond_N);
+	ocp_opts.set('qp_solver_ric_alg', qp_solver_ric_alg);
+end
 ocp_opts.set('qp_solver_cond_ric_alg', qp_solver_cond_ric_alg);
 ocp_opts.set('qp_solver_warm_start', qp_solver_warm_start);
 ocp_opts.set('qp_solver_iter_max', qp_solver_max_iter);
-if (~isempty(strfind(qp_solver, 'partial_condensing')))
-	ocp_opts.set('qp_solver_cond_N', qp_solver_cond_N);
-end
-if (strcmp(qp_solver, 'partial_condensing_hpipm'))
-	ocp_opts.set('qp_solver_ric_alg', qp_solver_ric_alg);
-end
 ocp_opts.set('sim_method', sim_method);
 ocp_opts.set('sim_method_num_stages', sim_method_num_stages);
 ocp_opts.set('sim_method_num_steps', sim_method_num_steps);
@@ -273,8 +271,66 @@ ocp.set('init_u', u_traj_init);
 % solve
 tic;
 
-% solve ocp
-ocp.solve();
+if 1
+
+	% solve ocp
+	ocp.solve();
+
+else
+
+	% do one step at the time
+	ocp.set('nlp_solver_max_iter', 1);
+
+	for ii=1:nlp_solver_max_iter
+
+		disp(['iteration number ', num2str(ii)])
+
+		% solve the system using 1 SQP iteration
+		ocp.solve();
+
+		% get QP hessian
+		qp_hess = ocp.get('qp_solver_H');
+
+		% print 1-iteration stat
+		ocp.print('stat');
+
+		% compute conditioning number and eigenvalues of hessian
+		if iscell(qp_hess)
+
+			for jj=1:length(qp_hess)
+
+				tmp_hess = qp_hess{jj};
+				nv = size(tmp_hess, 1);
+				% make full
+				for jj=1:nv
+					for ii=jj+1:nv
+						tmp_hess(jj,ii) = tmp_hess(ii,jj);
+					end
+				end
+				qp_hess_cond_num = cond(tmp_hess);
+				qp_hess_eig = eig(tmp_hess);
+				fprintf('hessian condition number %e %e %e\n', qp_hess_cond_num, min(qp_hess_eig), max(qp_hess_eig));
+
+			end
+
+		else
+			
+			nv = size(qp_hess, 1);
+			% make full
+			for jj=1:nv
+				for ii=jj+1:nv
+					qp_hess(jj,ii) = qp_hess(ii,jj);
+				end
+			end
+			qp_hess_cond_num = cond(qp_hess);
+			qp_hess_eig = eig(qp_hess);
+			fprintf('hessian condition number %e %e %e\n', qp_hess_cond_num, min(qp_hess_eig), max(qp_hess_eig));
+
+		end
+
+	end
+
+end
 
 time_ext = toc;
 % TODO: add getter for internal timing
@@ -339,6 +395,60 @@ if status==0
 else
 	fprintf('\nsolution failed!\n\n');
 end
+
+
+% paramteric sensitivity of solution
+
+if 0
+%if !strcmp(qp_solver, 'full_condensing_qpoases')
+
+	field = 'ex'; % equality constraint on states
+	stage = 0;
+	index = 0;
+	ocp.eval_param_sens(field, stage, index);
+
+	sens_u = ocp.get('sens_u');
+	sens_x = ocp.get('sens_x');
+
+	% plot sensitivity
+	figure
+	subplot(2,1,1);
+	plot(0:N, sens_x);
+	xlim([0 N]);
+	legend('p', 'theta', 'v', 'omega');
+	subplot(2,1,2);
+	plot(0:N-1, sens_u);
+	xlim([0 N]);
+	legend('F');
+
+	% plot predicted solution
+	figure
+	subplot(2,1,1);
+	plot(0:N, x+sens_x);
+	xlim([0 N]);
+	legend('p', 'theta', 'v', 'omega');
+	subplot(2,1,2);
+	plot(0:N-1, u+sens_u);
+	xlim([0 N]);
+	legend('F');
+
+	for ii=1:N+1
+		x_cur = x(:,ii)+sens_x(:,ii);
+	%	visualize;
+	end
+
+end
+
+
+%qp_hess = ocp.get('qp_solver_H');
+%nv = size(qp_hess, 1);
+%% make full
+%for jj=1:nv
+%	for ii=jj+1:nv
+%		qp_hess(jj,ii) = qp_hess(ii,jj);
+%	end
+%end
+%qp_hessian_cond_num = cond(qp_hess)
 
 
 if is_octave()

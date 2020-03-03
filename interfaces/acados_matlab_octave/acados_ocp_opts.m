@@ -64,7 +64,7 @@ classdef acados_ocp_opts < handle
             obj.opts_struct.nlp_solver_step_length = 1.0; % fixed step length in SQP algorithm
             obj.opts_struct.qp_solver = 'partial_condensing_hpipm';
             obj.opts_struct.qp_solver_iter_max = 50;
-            % obj.opts_struct.qp_solver_cond_N = 5; % New horizon after partial condensing
+            % obj.opts_struct.qp_solver_cond_N = 5; % for partial condensing_hpipm
             obj.opts_struct.qp_solver_cond_ric_alg = 0; % 0: dont factorize hessian in the condensing; 1: factorize
             obj.opts_struct.qp_solver_ric_alg = 0; % HPIPM specific
             obj.opts_struct.qp_solver_warm_start = 0;
@@ -77,7 +77,6 @@ classdef acados_ocp_opts < handle
             obj.opts_struct.sim_method_newton_iter = 3;
             obj.opts_struct.gnsf_detect_struct = 'true';
             obj.opts_struct.regularize_method = 'no_regularize';
-            obj.opts_struct.print_level = 0;
 
             obj.opts_struct.output_dir = fullfile(pwd, 'build');
             if ismac()
@@ -115,8 +114,6 @@ classdef acados_ocp_opts < handle
                 obj.opts_struct.nlp_solver_ext_qp_res = value;
             elseif (strcmp(field, 'nlp_solver_step_length'))
                 obj.opts_struct.nlp_solver_step_length = value;
-            elseif (strcmp(field, 'nlp_solver_warm_start_first_qp'))
-                obj.opts_struct.nlp_solver_warm_start_first_qp = value;
             elseif (strcmp(field, 'qp_solver'))
                 obj.opts_struct.qp_solver = value;
             elseif (strcmp(field, 'qp_solver_tol_stat'))
@@ -137,6 +134,8 @@ classdef acados_ocp_opts < handle
                 obj.opts_struct.qp_solver_ric_alg = value;
             elseif (strcmp(field, 'qp_solver_warm_start'))
                 obj.opts_struct.qp_solver_warm_start = value;
+            elseif (strcmp(field, 'warm_start_first_qp'))
+                obj.opts_struct.warm_start_first_qp = value;
             elseif (strcmp(field, 'sim_method'))
                 obj.opts_struct.sim_method = value;
             elseif (strcmp(field, 'sim_method_num_stages'))
@@ -153,8 +152,6 @@ classdef acados_ocp_opts < handle
                 obj.opts_struct.regularize_method = value;
             elseif (strcmp(field, 'output_dir'))
                 obj.opts_struct.output_dir = value;
-            elseif (strcmp(field, 'print_level'))
-                obj.opts_struct.print_level = value;
             elseif (strcmp(field, 'compile_mex'))
                 disp(['Option compile_mex is not supported anymore,'...
                     'please use compile_interface instead or dont set the option.', ...

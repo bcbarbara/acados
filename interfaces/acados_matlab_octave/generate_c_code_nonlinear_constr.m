@@ -32,16 +32,16 @@
 %
 
 
-function generate_c_code_nonlinear_constr( model, opts, target_dir )
+function generate_c_code_nonlinear_constr( model, opts )
 
 %% import casadi
 import casadi.*
 
 casadi_version = CasadiMeta.version();
-if ( strcmp(casadi_version(1:3),'3.4') || strcmp(casadi_version(1:3),'3.5')) % require casadi 3.4.x
+if strcmp(casadi_version(1:3),'3.4') % require casadi 3.4.x
     casadi_opts = struct('mex', false, 'casadi_int', 'int', 'casadi_real', 'double');
 else % old casadi versions
-    error('Please provide CasADi version 3.4 or 3.5 to ensure compatibility with acados')
+    error('Please download and install CasADi version 3.4.x to ensure compatibility with acados')
 end
 
 %% load model
@@ -49,7 +49,7 @@ end
 x = model.sym_x;
 nx = length(x);
 % check type
-if isa(x(1), 'casadi.SX')
+if class(x(1)) == 'casadi.SX'
     isSX = true;
 else
     isSX = false;
@@ -84,15 +84,6 @@ end
 
 model_name = model.name;
 
-% cd to target folder
-if nargin > 2
-    original_dir = pwd;
-    if ~exist(target_dir, 'dir')
-        mkdir(target_dir);
-    end
-    chdir(target_dir)
-end
-
 if isfield(model, 'constr_expr_h')
     h = model.constr_expr_h;
     % multipliers for hessian
@@ -110,12 +101,12 @@ if isfield(model, 'constr_expr_h')
     % generate hessian
     hess_ux = jacobian(adj_ux, [u; x]);
     % Set up functions
-    h_fun = Function([model_name,'_constr_h_fun'], {x, u, z, p}, {h});
-    h_fun_jac_uxt_zt = Function([model_name,'_constr_h_fun_jac_uxt_zt'], {x, u, z, p}, {h, jac_ux', jac_z'});
+    h_fun = Function([model_name,'_constr_h_fun'], {x, u, z, p}, {h}); % TODO(andrea): change function names to include z
+    h_fun_jac_ut_xt = Function([model_name,'_constr_h_fun_jac_ut_xt'], {x, u, z, p}, {h, jac_ux', jac_z'}); % TODO(andrea): change function names to include z
     h_fun_jac_ut_xt_hess = Function([model_name,'_constr_h_fun_jac_ut_xt_hess'], {x, u, lam_h, z, p}, {h, jac_ux', hess_ux});
     % generate C code
-    h_fun.generate([model_name,'_constr_h_fun'], casadi_opts);
-    h_fun_jac_uxt_zt.generate([model_name,'_constr_h_fun_jac_uxt_zt'], casadi_opts);
+    h_fun.generate([model_name,'_constr_h_fun'], casadi_opts); % TODO(andrea): change function names to include z
+    h_fun_jac_ut_xt.generate([model_name,'_constr_h_fun_jac_ut_xt'], casadi_opts); % TODO(andrea): change function names to include z
     h_fun_jac_ut_xt_hess.generate([model_name,'_constr_h_fun_jac_ut_xt_hess'], casadi_opts);
 end
 
@@ -136,17 +127,10 @@ if isfield(model, 'constr_expr_h_e')
     hess_ux_e = jacobian(adj_ux_e, x);
     % Set up functions
     h_e_fun = Function([model_name,'_constr_h_e_fun'], {x, p}, {h_e});
-    h_e_fun_jac_uxt_zt = Function([model_name,'_constr_h_e_fun_jac_uxt_zt'], {x, p}, {h_e, jac_x_e'});
-    h_e_fun_jac_uxt_zt_hess = Function([model_name,'_constr_h_e_fun_jac_uxt_zt_hess'], {x, lam_h_e, p}, {h_e, jac_x_e', hess_ux_e});
+    h_e_fun_jac_ut_xt = Function([model_name,'_constr_h_e_fun_jac_ut_xt'], {x, p}, {h_e, jac_x_e'});
+    h_e_fun_jac_ut_xt_hess = Function([model_name,'_constr_h_e_fun_jac_ut_xt_hess'], {x, lam_h_e, p}, {h_e, jac_x_e', hess_ux_e});
     % generate C code
     h_e_fun.generate([model_name,'_constr_h_e_fun'], casadi_opts);
-    h_e_fun_jac_uxt_zt.generate([model_name,'_constr_h_e_fun_jac_uxt_zt'], casadi_opts);
-    h_e_fun_jac_uxt_zt_hess.generate([model_name,'_constr_h_e_fun_jac_uxt_zt_hess'], casadi_opts);
-end
-
-if nargin > 2
-    chdir(original_dir)
-end
-
-
+    h_e_fun_jac_ut_xt.generate([model_name,'_constr_h_e_fun_jac_ut_xt'], casadi_opts);
+    h_e_fun_jac_ut_xt_hess.generate([model_name,'_constr_h_e_fun_jac_ut_xt_hess'], casadi_opts);
 end

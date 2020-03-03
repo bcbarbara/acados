@@ -31,126 +31,61 @@
 # POSSIBILITY OF SUCH DAMAGE.;
 #
 
-import os
-from casadi import *
-from .utils import ALLOWED_CASADI_VERSIONS, is_empty, casadi_length
 
-def generate_c_code_constraint( model, con_name, is_terminal ):
+from casadi import *
+import os
+
+def generate_c_code_constraint( constraint, suffix_name ):
 
     casadi_version = CasadiMeta.version()
     casadi_opts = dict(mex=False, casadi_int='int', casadi_real='double')
 
-    if casadi_version not in (ALLOWED_CASADI_VERSIONS):
-        msg =  'Please download and install CasADi {} '.format(" or ".join(ALLOWED_CASADI_VERSIONS))
-        msg += 'to ensure compatibility with acados.\n'
-        msg += 'Version {} currently in use.'.format(casadi_version)
-        raise Exception(msg)
-
-    if is_terminal:
-        con_h_expr = model.con_h_expr_e
-        con_phi_expr = model.con_phi_expr_e
-        # create dummy u, z
-        u = SX.sym('u', 0, 0)
-        z = SX.sym('z', 0, 0)
-    else:
-        con_h_expr = model.con_h_expr
-        con_phi_expr = model.con_phi_expr
-        u = model.u
-        z = model.z
+    if  casadi_version not in ('3.4.5', '3.4.0'):
+        # old casadi versions
+        raise Exception('Please download and install Casadi 3.4.0 to ensure compatibility with acados. Version ' + casadi_version + ' currently in use.')
 
     # load constraint variables and expression
-    x = model.x
-    p = model.p
+    x = constraint.x
+    u = constraint.u
+    p = constraint.p
+    # nc = nh or np 
+    nc = constraint.nc 
+    con_exp = constraint.expr
+    con_name = constraint.name
 
+    # get dimensions
+    nx = x.size()[0]
+    nu = u.size()[0]
 
-    if isinstance(x, casadi.SX):
-        is_SX = True
-    else:
-        is_SX = False
-
-    if (not is_empty(con_h_expr)) and (not is_empty(con_phi_expr)):
-        raise Exception("acados: you can either have constraint_h, or constraint_phi, not both.")
-
-    if not (is_empty(con_h_expr) and is_empty(con_phi_expr)):
-        if is_empty(con_h_expr):
-            constr_type = 'BGP'
+    if type(p) is list:
+        # check that z is empty
+        if len(p) == 0:
+            np = 0
+            p = SX.sym('p', 0, 0)
         else:
-            constr_type = 'BGH'
+            raise Exception('p is a non-empty list. It should be either an empty list or an SX object.')
+    else:
+        np = p.size()[0]
 
-        if is_empty(p):
-            if is_SX:
-                p = SX.sym('p', 0, 0)
-            else:
-                p = MX.sym('p', 0, 0)
+    # set up functions to be exported
+    fun_name = con_name + suffix_name
+    # TODO(andrea): first output seems to be ignored in the C code
+    jac_x = jacobian(con_exp, x);
+    jac_u = jacobian(con_exp, u);
+    constraint_fun_jac_tran = Function(fun_name, [x, u, p], [con_exp, vertcat(transpose(jac_u), transpose(jac_x))])
 
-        if is_empty(z):
-            if is_SX:
-                z = SX.sym('z', 0, 0)
-            else:
-                z = MX.sym('z', 0, 0)
+    # generate C code
+    if not os.path.exists('c_generated_code'):
+        os.mkdir('c_generated_code')
 
-        # set up & change directory
-        if not os.path.exists('c_generated_code'):
-            os.mkdir('c_generated_code')
-        os.chdir('c_generated_code')
-        gen_dir = con_name + '_constraints'
-        if not os.path.exists(gen_dir):
-            os.mkdir(gen_dir)
-        gen_dir_location = './' + gen_dir
-        os.chdir(gen_dir_location)
-
-        # export casadi functions
-        if constr_type == 'BGH':
-            if is_terminal:
-                fun_name = con_name + '_constr_h_e_fun_jac_uxt_zt'
-            else:
-                fun_name = con_name + '_constr_h_fun_jac_uxt_zt'
-
-            jac_x = jacobian(con_h_expr, x)
-            jac_u = jacobian(con_h_expr, u)
-            jac_z = jacobian(con_h_expr, z)
-            constraint_fun_jac_tran = \
-                Function(fun_name, [x, u, z, p], \
-                [con_h_expr, vertcat(transpose(jac_u), \
-                transpose(jac_x)), transpose(jac_z)])
-
-            constraint_fun_jac_tran.generate(fun_name, casadi_opts)
-
-        else: # BGP constraint
-            if is_terminal:
-                fun_name = con_name + '_phi_e_constraint'
-                r = model.con_r_in_phi_e
-                con_r_expr = model.con_r_expr_e
-            else:
-                fun_name = con_name + '_phi_constraint'
-                r = model.con_r_in_phi
-                con_r_expr = model.con_r_expr
-
-            nphi = casadi_length(con_phi_expr)
-            con_phi_expr_x_u_z = substitute(con_phi_expr, r, con_r_expr)
-            phi_jac_u = jacobian(con_phi_expr_x_u_z, u)
-            phi_jac_x = jacobian(con_phi_expr_x_u_z, x)
-            phi_jac_z = jacobian(con_phi_expr_x_u_z, z)
-
-            hess = hessian(con_phi_expr[0], r)[0]
-            for i in range(1, nphi):
-                hess = vertcat(hess, hessian(con_phi_expr[i], r)[0])
-
-            r_jac_u = jacobian(con_r_expr, u)
-            r_jac_x = jacobian(con_r_expr, x)
-
-            constraint_phi = \
-                Function(fun_name, [x, u, z, p], \
-                    [con_phi_expr_x_u_z, \
-                    vertcat(transpose(phi_jac_u), \
-                    transpose(phi_jac_x)), \
-                    transpose(phi_jac_z), \
-                    hess, vertcat(transpose(r_jac_u), \
-                    transpose(r_jac_x))])
-
-            constraint_phi.generate(fun_name, casadi_opts)
-
-        # change directory back
-        os.chdir('../..')
+    os.chdir('c_generated_code')
+    gen_dir = con_name + suffix_name 
+    if not os.path.exists(gen_dir):
+        os.mkdir(gen_dir)
+    gen_dir_location = './' + gen_dir
+    os.chdir(gen_dir_location)
+    file_name = con_name + suffix_name
+    constraint_fun_jac_tran.generate(file_name, casadi_opts)
+    os.chdir('../..')
 
     return

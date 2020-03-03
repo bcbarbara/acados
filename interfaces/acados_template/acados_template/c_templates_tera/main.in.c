@@ -40,8 +40,46 @@
 #include "acados/utils/math.h"
 #include "acados_c/ocp_nlp_interface.h"
 #include "acados_c/external_function_interface.h"
-#include "acados_solver_{{ model.name }}.h"
+#include "acados_solver_{{model.name}}.h"
 
+// ** global data **
+ocp_nlp_in * nlp_in;
+ocp_nlp_out * nlp_out;
+ocp_nlp_solver * nlp_solver;
+void * nlp_opts;
+ocp_nlp_plan * nlp_solver_plan;
+ocp_nlp_config * nlp_config;
+ocp_nlp_dims * nlp_dims;
+{% if solver_config.integrator_type == "ERK" %}
+external_function_param_casadi * forw_vde_casadi;
+{% if solver_config.hessian_approx == "EXACT" %} 
+external_function_param_casadi * hess_vde_casadi;
+{%- endif %}
+{% else %}
+{% if solver_config.integrator_type == "IRK" -%}
+external_function_param_casadi * impl_dae_fun;
+external_function_param_casadi * impl_dae_fun_jac_x_xdot_z;
+external_function_param_casadi * impl_dae_jac_x_xdot_u_z;
+{%- endif %}
+{%- endif %}
+{% if dims.npd > 0 %}
+external_function_casadi * p_constraint;
+{%- endif %}
+{% if dims.npd_e > 0 %}
+external_function_casadi * p_e_constraint;
+{%- endif %}
+{% if dims.nh > 0 %}
+external_function_casadi * h_constraint;
+{%- endif %}
+{% if dims.nh_e > 0 %}
+external_function_casadi h_e_constraint;
+{% endif %}
+{% if cost.cost_type == "NONLINEAR_LS" %}
+external_function_casadi * r_cost;
+{% endif %}
+{% if cost.cost_type_e == "NONLINEAR_LS" %}
+external_function_casadi r_e_cost;
+{% endif %}
 
 int main()
 {
@@ -50,95 +88,83 @@ int main()
     status = acados_create();
 
     if (status)
-    {
-        printf("acados_create() returned status %d. Exiting.\n", status);
+    { 
+        printf("acados_create() returned status %d. Exiting.\n", status); 
         exit(1);
     }
 
-    // initial condition
-    int idxbx0[{{ dims.nbx_0 }}];
-    {% for i in range(end=dims.nbx_0) %}
-    idxbx0[{{ i }}] = {{ constraints.idxbx_0[i] }};
+    // set initial condition
+    double x0[{{ dims.nx }}];
+    {% for item in constraints.x0 %}
+    x0[{{ loop.index0 }}] = {{ item }};
     {%- endfor %}
-
-    double lbx0[{{ dims.nbx_0 }}];
-    double ubx0[{{ dims.nbx_0 }}];
-    {% for i in range(end=dims.nbx_0) %}
-    lbx0[{{ i }}] = {{ constraints.lbx_0[i] }};
-    ubx0[{{ i }}] = {{ constraints.ubx_0[i] }};
-    {%- endfor %}
-
-    ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "idxbx", idxbx0);
-    ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "lbx", lbx0);
-    ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "ubx", ubx0);
+    ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "lbx", x0);
+    ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "ubx", x0);
 
     // initialization for state values
-    double x_init[{{ dims.nx }}];
+    double x_init[{{dims.nx}}];
     {%- for i in range(end=dims.nx) %}
     x_init[{{ i }}] = 0.0;
     {%- endfor %}
 
     // initial value for control input
-    double u0[{{ dims.nu }}];
+    double u0[{{dims.nu}}];
     {%- for i in range(end=dims.nu) %}
-    u0[{{ i }}] = 0.0;
+    u0[{{i}}] = 0.0;
     {%- endfor %}
 
+    // xtraj
+    double xtraj[{{dims.nx}} * ({{dims.N}}+1)];
+    // utraj
+    double utraj[{{dims.nu}} * ({{dims.N}})];
 
-  {%- if dims.np > 0 %}
+    {%- if dims.np > 0%}
     // set parameters
-    double p[{{ dims.np }}];
-    {% for item in parameter_values %}
+    double p[{{dims.np}}];
+    {% for item in constraints.p %}
     p[{{ loop.index0 }}] = {{ item }};
     {% endfor %}
-
-
-    {%- if solver_options.integrator_type == "IRK" -%}
-    for (int ii = 0; ii < {{ dims.N }}; ii++)
-    {
-        impl_dae_fun[ii].set_param(impl_dae_fun+ii, p);
-        impl_dae_fun_jac_x_xdot_z[ii].set_param(impl_dae_fun_jac_x_xdot_z+ii, p);
-        impl_dae_jac_x_xdot_u_z[ii].set_param(impl_dae_jac_x_xdot_u_z+ii, p);
+    
+    {%- if solver_config.integrator_type == "IRK" %}
+    for (int ii = 0; ii < {{ dims.N }}; ii++) {
+    impl_dae_fun[ii].set_param(impl_dae_fun+ii, p);
+    impl_dae_fun_jac_x_xdot_z[ii].set_param(impl_dae_fun_jac_x_xdot_z+ii, p);
+    impl_dae_jac_x_xdot_u_z[ii].set_param(impl_dae_jac_x_xdot_u_z+ii, p);
     }
-    {% elif solver_options.integrator_type == "ERK" %}
-    for (int ii = 0; ii < {{ dims.N }}; ii++)
-    {
-        forw_vde_casadi[ii].set_param(forw_vde_casadi+ii, p);
+    {%- else %}
+    for (int ii = 0; ii < {{ dims.N }}; ii++) {
+    forw_vde_casadi[ii].set_param(forw_vde_casadi+ii, p);
     }
     {%- endif %}
-    for (int ii = 0; ii < {{ dims.N }}; ii++) {
-        {%- if constraints.constr_type == "BGP" %}
-        // r_constraint[ii].set_param(r_constraint+ii, p);
-        phi_constraint[ii].set_param(phi_constraint+ii, p);
-        {%- endif %}
+    for (int ii = 0; ii < {{ dims.N }}; ++ii) {
+        {%- if dims.npd > 0 %}
+        p_constraint[ii].set_param(p_constraint+ii, p);
+        {% endif %}
         {%- if dims.nh > 0 %}
         h_constraint[ii].set_param(h_constraint+ii, p);
         {% endif %}
     }
-    {%- if constraints.constr_type_e == "BGP" %}
-    // r_e_constraint.set_param(&r_e_constraint, p);
-    phi_e_constraint.set_param(&phi_e_constraint, p);
-    {% endif %}
+    {%- if dims.npd_e > 0 %}
+    p_e_constraint.set_param(&p_e_constraint, p);
+    {%- endif %}
     {%- if dims.nh_e > 0 %}
     h_e_constraint.set_param(&h_e_constraint, p);
-    {% endif %}
-  {% endif %}{# if np > 0 #}
+    {%- endif %}
+
+    double kkt_norm_inf = 1e12, elapsed_time;
 
     // prepare evaluation
-    int NTIMINGS = 1;
+    int NTIMINGS = 10;
     double min_time = 1e12;
     double kkt_norm_inf;
     double elapsed_time;
     int sqp_iter;
 
-    double xtraj[{{ dims.nx }} * ({{ dims.N }}+1)];
-    double utraj[{{ dims.nu }} * ({{ dims.N }})];
-
     // solve ocp in loop
-    for (int ii = 0; ii < NTIMINGS; ii++)
+    for (int ii = 0; ii < NTIMINGS; ii ++)
     {
         // initialize solution
-        for (int i = 0; i <= nlp_dims->N; i++)
+        for (int i = 0; i <= nlp_dims->N; ++i)
         {
             ocp_nlp_out_set(nlp_config, nlp_dims, nlp_out, i, "x", x_init);
             ocp_nlp_out_set(nlp_config, nlp_dims, nlp_out, i, "u", u0);
@@ -150,25 +176,25 @@ int main()
 
     /* print solution and statistics */
     for (int ii = 0; ii <= nlp_dims->N; ii++)
-        ocp_nlp_out_get(nlp_config, nlp_dims, nlp_out, ii, "x", &xtraj[ii*{{ dims.nx }}]);
+        ocp_nlp_out_get(nlp_config, nlp_dims, nlp_out, ii, "x", &xtraj[ii*{{dims.nx}}]);
     for (int ii = 0; ii < nlp_dims->N; ii++)
-        ocp_nlp_out_get(nlp_config, nlp_dims, nlp_out, ii, "u", &utraj[ii*{{ dims.nu }}]);
+        ocp_nlp_out_get(nlp_config, nlp_dims, nlp_out, ii, "u", &utraj[ii*{{dims.nu}}]);
 
     printf("\n--- xtraj ---\n");
-    d_print_exp_tran_mat( {{ dims.nx }}, {{ dims.N }}+1, xtraj, {{ dims.nx }} );
+    d_print_exp_tran_mat( {{dims.nx}}, {{dims.N}}+1, xtraj, {{dims.nx}} );
     printf("\n--- utraj ---\n");
-    d_print_exp_tran_mat( {{ dims.nu }}, {{ dims.N }}, utraj, {{ dims.nu }} );
+    d_print_exp_tran_mat( {{dims.nu}}, {{dims.N}}, utraj, {{dims.nu}} );
     // ocp_nlp_out_print(nlp_solver->dims, nlp_out);
 
     printf("\nsolved ocp %d times, solution printed above\n\n", NTIMINGS);
 
     if (status == ACADOS_SUCCESS)
     {
-        printf("acados_solve(): SUCCESS!\n");
+        printf("acdos_solve(): SUCCESS!\n");
     }
     else
     {
-        printf("acados_solve() failed with status %d.\n", status);
+        printf("acados_solve() failed with status %d.\n", status); 
     }
 
     // get solution
@@ -181,8 +207,8 @@ int main()
 
     // free solver
     status = acados_free();
-    if (status) {
-        printf("acados_free() returned status %d. \n", status);
+    if (status) { 
+        printf("acados_free() returned status %d. \n", status); 
     }
 
     return status;

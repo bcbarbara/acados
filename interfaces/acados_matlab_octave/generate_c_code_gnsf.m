@@ -38,10 +38,10 @@ function generate_c_code_gnsf(model, opts)
 import casadi.*
 
 casadi_version = CasadiMeta.version();
-if ( strcmp(casadi_version(1:3),'3.4') || strcmp(casadi_version(1:3),'3.5')) % require casadi 3.4.x
+if strcmp(casadi_version(1:3),'3.4') % require casadi 3.4.x
     casadi_opts = struct('mex', false, 'casadi_int', 'int', 'casadi_real', 'double');
 else % old casadi versions
-    error('Please provide CasADi version 3.4 or 3.5 to ensure compatibility with acados')
+    error('Please download and install CasADi version 3.4.x to ensure compatibility with acados')
 end
 
 
@@ -76,7 +76,7 @@ idx_perm_f = model.dyn_gnsf_idx_perm_f;
 x = model.sym_x;
 x1 = x(model.dyn_gnsf_idx_perm_x(1:model.dim_gnsf_nx1));
 % check type
-if isa(x(1), 'casadi.SX')
+if class(x(1)) == 'casadi.SX'
     isSX = true;
 else
     isSX = false;
@@ -134,7 +134,7 @@ model_name = model.name;
 model_name = [model_name, '_dyn'];
 
 %% generate functions
-if ~purely_linear
+if ~model.dyn_gnsf_purely_linear
     jac_phi_y = jacobian(phi,y);
     jac_phi_uhat = jacobian(phi,uhat);
 
@@ -146,7 +146,7 @@ if ~purely_linear
     phi_fun_jac_y.generate([model_name,'_gnsf_phi_fun_jac_y'], casadi_opts);
     phi_jac_y_uhat.generate([model_name,'_gnsf_phi_jac_y_uhat'], casadi_opts);
     
-    if nontrivial_f_LO
+    if model.dyn_gnsf_nontrivial_f_LO
         f_lo_fun_jac_x1k1uz = Function([model_name,'_gnsf_f_lo_fun_jac_x1k1uz'], {x1, x1dot, z1, u, p}, ...
             {f_lo, [jacobian(f_lo,x1), jacobian(f_lo,x1dot), jacobian(f_lo,u), jacobian(f_lo,z1)]});
         f_lo_fun_jac_x1k1uz.generate([model_name,'_gnsf_f_lo_fun_jac_x1k1uz'], casadi_opts);

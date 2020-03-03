@@ -53,33 +53,23 @@ function model = detect_cost_type(model, is_e)
         z = SX.sym('z', 0, 0);
     end
 
-    if isfield(model, 'sym_p')
-        p = model.sym_p;
-    else
-        p = SX.sym('p', 0, 0);
-    end
-
     nx = length(x);
     nu = length(u);
     nz = length(z);
-%     np = length(p);
 
     % z = model.sym_z;
-    disp('--------------------------------------------------------------');
     if is_e
         expr_cost = model.cost_expr_ext_cost_e;
-        disp('Structure detection for terminal cost term');
     else
         expr_cost = model.cost_expr_ext_cost;
-        disp('Structure detection for path cost');
     end
     cost_fun = Function('cost_fun', {x, u, z}, {expr_cost});
 
-    if expr_cost.is_quadratic(x) && expr_cost.is_quadratic(u) && expr_cost.is_quadratic(z) ...
-            && ~any(expr_cost.which_depends(p))
+
+    if expr_cost.is_quadratic(x) && expr_cost.is_quadratic(u) && expr_cost.is_quadratic(z)
         dummy = SX.sym('dummy', 1, 1);
         
-        fprintf('Cost function is quadratic -> Reformulating as linear_ls cost.\n');
+        fprintf('\n\nCost function is quadratic -> Reformulating as linear_ls cost.\n\n');
 
         Hxuz_fun = Function('Hxuz_fun', {dummy}, {hessian(expr_cost, [x; u; z])});
         H_xuz = full(Hxuz_fun(0));
@@ -124,7 +114,7 @@ function model = detect_cost_type(model, is_e)
         xuz = [x; u; z];
         sym_y = xuz(xuz_idx);
         jac_fun = Function('jac_fun', {sym_y}, {jacobian(expr_cost, sym_y)'});
-        y_ref = -W \ ( .5 * full(jac_fun(zeros(ny,1))) );
+        y_ref = .5 * full(jac_fun(zeros(ny,1)));
 
         y = -y_ref + Vx * x + Vu * u;
         if nz > 0
@@ -136,19 +126,14 @@ function model = detect_cost_type(model, is_e)
             x0 = rand(nx,1);
             u0 = rand(nu,1);
             z0 = rand(nz,1);
-
-            val1 = lls_cost_fun(x0, u0, z0);
-            val2 = cost_fun(x0, u0, z0);
+            val1 = lls_cost_fun(x0, z0, u0);
+            val2 = cost_fun(x0, z0, u0);
             if norm(full(val1 - val2))> 1e-13
                 disp('something went wrong when reformulating with linear least square cost');
                 keyboard
             end
         end
 
-        %% take into account 1/2 factor in linear least square module
-        W = 2 * W;
-
-        %% extract output
         if is_e
             model.cost_type_e = 'linear_ls';
             model.dim_ny_e = ny;
@@ -168,22 +153,7 @@ function model = detect_cost_type(model, is_e)
             model.cost_W = W;
             model.cost_y_ref = y_ref;
         end
-        fprintf('\n\nreformulated cost term in linear least squares form with:')
-        fprintf('\ncost = 0.5 * || Vx * x + Vu * u + Vz * z - y_ref ||_W\n');
-        fprintf('\nVx\n');
-        disp(Vx);
-        fprintf('\nVu\n');
-        disp(Vu);
-        fprintf('\nVz\n');
-        disp(Vz);
-        fprintf('\nW\n');
-        disp(W);
-        fprintf('\ny_ref\n');
-        disp(y_ref);
-        fprintf('\ny (symbolic)\n');
-        disp(sym_y);
-        fprintf('\nNOTE: These numerical values can be updated online using the appropriate setters.\n');
-% elseif
+    % elseif 
     %  TODO: can nonlinear_ls be detected?!
     else
         fprintf('\n\nCost function is not quadratic -> Using external cost\n\n');
@@ -193,6 +163,5 @@ function model = detect_cost_type(model, is_e)
             model.cost_type = 'ext_cost';
         end
     end
-    disp('--------------------------------------------------------------');
 
 end

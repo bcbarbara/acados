@@ -36,30 +36,19 @@ function ocp_json = set_up_acados_ocp_nlp_json(obj)
     model = obj.model_struct;
     % create
     ocp_json = acados_template_mex.acados_ocp_nlp_json();
-    % TODO(andrea): this is temporary. later on the solver_options
+    % TODO(andrea): this is temporary. later on the solver_config
     % object will separate from the OCP object
 
     % general
-    ocp_json.dims.N = obj.opts_struct.param_scheme_N;
-    ocp_json.solver_options.tf = model.T;
-    ocp_json.solver_options.Tsim = model.T / obj.opts_struct.param_scheme_N; % for templated integrator
+    ocp_json.solver_config.qp_solver = upper(obj.opts_struct.qp_solver);
+    ocp_json.solver_config.integrator_type = upper(obj.opts_struct.sim_method);
+    ocp_json.solver_config.nlp_solver_type = upper(obj.opts_struct.nlp_solver);
+    ocp_json.solver_config.sim_method_num_steps = obj.opts_struct.sim_method_num_steps;
+    ocp_json.solver_config.sim_method_num_stages = obj.opts_struct.sim_method_num_stages;
+    ocp_json.dims.N = upper(obj.opts_struct.param_scheme_N);
+
+    ocp_json.solver_config.tf = model.T;
     ocp_json.model.name = model.name;
-    % modules
-    ocp_json.solver_options.qp_solver = upper(obj.opts_struct.qp_solver);
-    ocp_json.solver_options.integrator_type = upper(obj.opts_struct.sim_method);
-    ocp_json.solver_options.nlp_solver_type = upper(obj.opts_struct.nlp_solver);
-    % options
-    ocp_json.solver_options.sim_method_num_steps = obj.opts_struct.sim_method_num_steps;
-    ocp_json.solver_options.sim_method_num_stages = obj.opts_struct.sim_method_num_stages;
-    ocp_json.solver_options.sim_method_newton_iter = obj.opts_struct.sim_method_newton_iter;
-    ocp_json.solver_options.nlp_solver_max_iter = obj.opts_struct.nlp_solver_max_iter;
-    ocp_json.solver_options.nlp_solver_tol_stat = obj.opts_struct.nlp_solver_tol_stat;
-    ocp_json.solver_options.nlp_solver_tol_eq = obj.opts_struct.nlp_solver_tol_eq;
-    ocp_json.solver_options.nlp_solver_tol_ineq = obj.opts_struct.nlp_solver_tol_ineq;
-    ocp_json.solver_options.nlp_solver_tol_comp = obj.opts_struct.nlp_solver_tol_comp;
-    ocp_json.solver_options.nlp_solver_step_length = obj.opts_struct.nlp_solver_step_length;
-    ocp_json.solver_options.qp_solver_cond_N = obj.opts_struct.qp_solver_cond_N;
-    ocp_json.solver_options.qp_solver_iter_max = obj.opts_struct.qp_solver_iter_max;
 
     %% dims
     nx = model.dim_nx;
@@ -67,10 +56,10 @@ function ocp_json = set_up_acados_ocp_nlp_json(obj)
     ocp_json.dims.nx = model.dim_nx;
     ocp_json.dims.nu = model.dim_nu;
     ocp_json.dims.nz = model.dim_nz;
-    ocp_json.dims.np = model.dim_np;
+    % missing in MEX (?!)
+    % ocp_json.dims.np = model.dim_np;
     ocp_json.dims.ny = model.dim_ny;
     ocp_json.dims.nbx = model.dim_nbx;
-    ocp_json.dims.nbx_0 = model.dim_nbx_0;
     ocp_json.dims.nbu = model.dim_nbu;
     ocp_json.dims.ng = model.dim_ng;
     ocp_json.dims.nh = model.dim_nh;
@@ -80,10 +69,10 @@ function ocp_json = set_up_acados_ocp_nlp_json(obj)
     if isfield(model, 'dim_nsbx')
         ocp_json.dims.nsbx = model.dim_nsbx;
     end
-    if isfield(model, 'dim_nsbu')
+    if isfield(model, 'dim_nsbx')
         ocp_json.dims.nsbu = model.dim_nsbu;
     end
-
+    
     % missing in template
     % ocp_json.dims.nsg = model.nsg;
 
@@ -121,34 +110,16 @@ function ocp_json = set_up_acados_ocp_nlp_json(obj)
     ocp_json.constraints.constr_type = upper(model.constr_type);
     ocp_json.constraints.constr_type_e = upper(model.constr_type_e);
 
-    % parameters
-    if model.dim_np > 0
-        % TODO: add option to initialize parameters in model.
-        warning(['model parameters value cannot be defined (yet) for ocp json.', ...
-                    10 'Using zeros(np,1) by default.' 10 'You can update them later using the solver object.']);
-        ocp_json.parameter_values = zeros(model.dim_np,1);
-    end
-
     %% constraints
-    % initial
-    if isfield(model, 'constr_lbx_0')
-        ocp_json.constraints.lbx_0 = model.constr_lbx_0;
-    else
-        warning('missing: constr_lbx_0, using zeros of appropriate dimension.');
-        ocp_json.constraints.lbx_0 = zeros(ocp_json.dims.nbx_0, 1);
-    end
-
-    if isfield(model, 'constr_ubx_0')
-        ocp_json.constraints.ubx_0 = model.constr_ubx_0;
-    else
-        warning('missing: constr_ubx_0, using zeros of appropriate dimension.');
-        ocp_json.constraints.ubx_0 = zeros(ocp_json.dims.nbx_0, 1);
-    end
-    if isfield(model, 'constr_Jbx_0')
-        ocp_json.constraints.idxbx_0 = J_to_idx( model.constr_Jbx_0 );
-    end
-
     % path
+    if isfield(model, 'constr_x0')
+        ocp_json.constraints.x0 = model.constr_x0;
+    else
+        warning('constr_x0 not defined for ocp json.');
+        warning('using zeros(nx,1) as initial state value.');
+        ocp_json.constraints.x0 = zeros(nx,1);
+    end
+
     if ocp_json.dims.nbx > 0
         ocp_json.constraints.idxbx = J_to_idx( model.constr_Jbx );
         ocp_json.constraints.lbx = model.constr_lbx;
@@ -169,56 +140,36 @@ function ocp_json = set_up_acados_ocp_nlp_json(obj)
     end
 
     if ocp_json.dims.nh > 0
+        ocp_json.con_h.name = 'expr_h';
+        ocp_json.con_h.expr = model.constr_expr_h;
         ocp_json.constraints.lh = model.constr_lh;
         ocp_json.constraints.uh = model.constr_uh;
+        % TODO(oj): can we get rid of the following?
+        if isfield(model, 'sym_x')
+            ocp_json.con_h.x = model.sym_x;
+        end
+        if isfield(model, 'sym_u')
+            ocp_json.con_h.u = model.sym_u;
+        end
+        if isfield(model, 'sym_z')
+            ocp_json.con_h.z = model.sym_z;
+        end
     end
 
     if ocp_json.dims.nsbx > 0
-        ocp_json.constraints.idxsbx = J_to_idx_slack(model.constr_Jsbx);
-        if isfield(model, 'constr_lsbx')
-            ocp_json.constraints.lsbx = model.constr_lsbx;
-        else
-            ocp_json.constraints.lsbx = zeros(ocp_json.dims.nsbx, 1);
-        end
-        if isfield(model, 'constr_usbx')
-            ocp_json.constraints.usbx = model.constr_usbx;
-        else
-            ocp_json.constraints.usbx = zeros(ocp_json.dims.nsbx, 1);
-        end
-        % TODO(oj): add nsbx_e properly in Matlab:
-        ocp_json.dims.nsbx_e = model.dim_nsbx;
-        ocp_json.constraints.idxsbx_e = ocp_json.constraints.idxsbx;
-        ocp_json.constraints.lsbx_e = ocp_json.constraints.lsbx;
-        ocp_json.constraints.usbx_e = ocp_json.constraints.usbx;
+        ocp_json.constraints.idxsbx = J_to_idx_slack(model.Jsbx);
+        ocp_json.constraints.lsbx = model.lsbx;
+        ocp_json.constraints.usbx = model.usbx;
     end
-
 
     if ocp_json.dims.nsbu > 0
         ocp_json.constraints.idxsbu = J_to_idx_slack(model.Jsbu);
-        if isfield(model, 'constr_lsbu')
-            ocp_json.constraints.lsbu = model.constr_lsbu;
-        else
-            ocp_json.constraints.lsbu = zeros(ocp_json.dims.nsbu, 1);
-        end
-        if isfield(model, 'constr_usbu')
-            ocp_json.constraints.usbu = model.constr_usbu;
-        else
-            ocp_json.constraints.usbu = zeros(ocp_json.dims.nsbu, 1);
-        end
+        ocp_json.constraints.lsbu = model.lsbu;
+        ocp_json.constraints.usbu = model.usbu;
     end
 
     if ocp_json.dims.nsh > 0
-        ocp_json.constraints.idxsh = J_to_idx_slack(model.constr_Jsh);
-        if isfield(model, 'constr_lsh')
-            ocp_json.constraints.lsh = model.constr_lsh;
-        else
-            ocp_json.constraints.lsh = zeros(ocp_json.dims.nsh, 1);
-        end
-        if isfield(model, 'constr_ush')
-            ocp_json.constraints.ush = model.constr_ush;
-        else
-            ocp_json.constraints.ush = zeros(ocp_json.dims.nsh, 1);
-        end
+        ocp_json.constraints.idxsh = J_to_idx_slack(model.Jsh);
     end
 
     if isfield(model, 'dim_nsg') && model.dim_nsg > 0
@@ -235,28 +186,30 @@ function ocp_json = set_up_acados_ocp_nlp_json(obj)
     end
 
     if ocp_json.dims.nh_e > 0    
+        ocp_json.con_h_e.name = 'expr_h_e';
+        ocp_json.con_h_e.expr = model.constr_expr_h_e;
         ocp_json.constraints.lh_e = model.constr_lh_e;
         ocp_json.constraints.uh_e = model.constr_uh_e;
+        % TODO(oj): can we get rid of the following?
+        if isfield(model, 'sym_x')
+            ocp_json.con_h_e.x = model.sym_x;
+        end
+        if isfield(model, 'sym_u')
+            ocp_json.con_h_e.u = model.sym_u;
+        end
+        if isfield(model, 'sym_z')
+            ocp_json.con_h_e.z = model.sym_z;
+        end
     end
 
     if isfield(model, 'dim_nsg_e') && model.dim_nsg_e > 0
-        error('dim_nsg_e > 0 not implmented in templating backend');
+        error('dim_nsg_e > 0 not implmented in code-gen backend');
         % TODO set Jsg_e
     end
 
 
     if ocp_json.dims.nsh_e > 0
-        ocp_json.constraints.idxsh_e = J_to_idx_slack(model.constr_Jsh_e);
-        if isfield(model, 'constr_lsh_e')
-            ocp_json.constraints.lsh_e = model.constr_lsh_e;
-        else
-            ocp_json.constraints.lsh_e = zeros(ocp_json.dims.nsh_e, 1);
-        end
-        if isfield(model, 'constr_ush_e')
-            ocp_json.constraints.ush_e = model.constr_ush_e;
-        else
-            ocp_json.constraints.ush_e = zeros(ocp_json.dims.nsh_e, 1);
-        end
+        ocp_json.constraints.idxsh_e = J_to_idx_slack(model.Jsh_e);
     end
 
     %% Cost
@@ -273,7 +226,8 @@ function ocp_json = set_up_acados_ocp_nlp_json(obj)
         if isfield(model, 'cost_y_ref')
             ocp_json.cost.yref = model.cost_y_ref;
         else
-			warning(['cost_y_ref not defined for ocp json.' 10 'Using zeros(ny,1) by default.']);
+            warning('cost_y_ref not defined for ocp json.');
+            warning('using zeros(ny,1) as initial state value.');
             ocp_json.cost.yref = zeros(model.dim_ny,1);
         end
     end
@@ -287,16 +241,17 @@ function ocp_json = set_up_acados_ocp_nlp_json(obj)
         if isfield(model, 'cost_y_ref')
             ocp_json.cost.yref_e = model.cost_y_ref_e;
         else
-			warning(['cost_y_ref_e not defined for ocp json.' 10 'Using zeros(ny_e,1) by default.']);
+            warning('cost_y_ref_e not defined for ocp json.');
+            warning('using zeros(ny_e,1) as initial state value.');
             ocp_json.cost.yref_e = zeros(model.dim_ny_e,1);
         end
     end
 
     if isfield(model, 'cost_Zl')
-        ocp_json.cost.Zl = diag(model.cost_Zl);
+        ocp_json.cost.Zl = model.cost_Zl;
     end
     if isfield(model, 'cost_Zu')
-        ocp_json.cost.Zu = diag(model.cost_Zu);
+        ocp_json.cost.Zu = model.cost_Zu;
     end
     if isfield(model, 'cost_zl')
         ocp_json.cost.zl = model.cost_zl;
@@ -307,10 +262,10 @@ function ocp_json = set_up_acados_ocp_nlp_json(obj)
 
 
     if isfield(model, 'cost_Zl_e')
-        ocp_json.cost.Zl_e = diag(model.cost_Zl_e);
+        ocp_json.cost.Zl_e = model.cost_Zl_e;
     end
     if isfield(model, 'cost_Zu_e')
-        ocp_json.cost.Zu_e = diag(model.cost_Zu_e);
+        ocp_json.cost.Zu_e = model.cost_Zu_e;
     end
     if isfield(model, 'cost_zl_e')
         ocp_json.cost.zl_e = model.cost_zl_e;
@@ -319,7 +274,6 @@ function ocp_json = set_up_acados_ocp_nlp_json(obj)
         ocp_json.cost.zu_e = model.cost_zu_e;
     end
 
-    %% dynamics
     if strcmp(obj.opts_struct.sim_method, 'erk')
         ocp_json.model.f_expl_expr = model.dyn_expr_f;
     elseif strcmp(obj.opts_struct.sim_method, 'irk')
@@ -330,10 +284,15 @@ function ocp_json = set_up_acados_ocp_nlp_json(obj)
     %  TODO(oj): add gnsf support;
 
     ocp_json.model.x = model.sym_x;
-    ocp_json.model.u = model.sym_u;
-    ocp_json.model.z = model.sym_z;
-    ocp_json.model.xdot = model.sym_xdot;
-    ocp_json.model.p = model.sym_p;
+    if isfield(model, 'sym_u')
+        ocp_json.model.u = model.sym_u;
+    end
+    if isfield(model, 'sym_z')
+        ocp_json.model.z = model.sym_z;
+    end
+    if isfield(model, 'sym_xdot')
+        ocp_json.model.xdot = model.sym_xdot;
+    end
 
 end
 
@@ -356,26 +315,21 @@ function idx = J_to_idx(J)
     end
 end
 
-
 function idx = J_to_idx_slack(J)
     size_J = size(J);
     nrows = size_J(1);
-    ncol = size_J(2);
-    idx = zeros(ncol,1);
+    idx = zeros(nrows,1);
     i_idx = 1;
     for i = 1:nrows
         this_idx = find(J(i,:));
         if length(this_idx) == 1
-            idx(i_idx) = i - 1; % store 0-based index
             i_idx = i_idx + 1;
+            idx(i_idx) = this_idx - 1; % strore 0-based index
         elseif length(this_idx) > 1
-            error(['J_to_idx_slack: Invalid J matrix. Exiting. Found more than one nonzero in row ' num2str(i)]);
+            error(['J_to_idx: Invalid J matrix. Exiting. Found more than one nonzero in row ' num2str(i)]);
         end
         if J(i,this_idx) ~= 1
-            error(['J_to_idx_slack: J matrices can only contain 1s, got J(' num2str(i) ', ' num2str(this_idx) ') = ' num2str(J(i,this_idx)) ]);
+            error(['J_to_idx: J matrices can only contain 1s, got J(' num2str(i) ', ' num2str(this_idx) ') = ' num2str(J(i,this_idx)) ]);
         end
-    end
-    if i_idx ~= ncol + 1
-        error('J_to_idx_slack: J must contain a 1 in every column!')
     end
 end

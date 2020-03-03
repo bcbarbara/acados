@@ -31,49 +31,43 @@
 # POSSIBILITY OF SUCH DAMAGE.;
 #
 
-import os
 from casadi import *
-from .utils import ALLOWED_CASADI_VERSIONS
+import os
 
-def generate_c_code_nls_cost( model, cost_name, is_terminal ):
+def generate_c_code_nls_cost( cost ):
 
+    suffix_name = '_r_cost'
     casadi_version = CasadiMeta.version()
     casadi_opts = dict(mex=False, casadi_int='int', casadi_real='double')
 
-    if casadi_version not in (ALLOWED_CASADI_VERSIONS):
-        msg =  'Please download and install CasADi {} '.format(" or ".join(ALLOWED_CASADI_VERSIONS))
-        msg += 'to ensure compatibility with acados.\n'
-        msg += 'Version {} currently in use.'.format(casadi_version)
-        raise Exception(msg)
+    if casadi_version not in ('3.4.5', '3.4.0'):
+        # old casadi versions
+        raise Exception('Please download and install CasADi 3.4.0 to ensure compatibility with acados. Version ' + casadi_version + ' currently in use.')
 
+    # load cost variables and expression
+    x = cost.x
+    u = cost.u
+    cost_exp = cost.expr
+    cost_name = cost.name
 
-    if is_terminal:
-        suffix_name = '_r_e_cost'
-        u = SX.sym('u', 0, 0)
-        cost_expr = model.cost_y_expr_e
-
-    else:
-        suffix_name = '_r_cost'
-        u = model.u
-        cost_expr = model.cost_y_expr
-
-    x = model.x
-    p = model.p
+    # get dimensions
+    nx = x.size()[0]
+    nu = u.size()[0]
 
     # set up functions to be exported
     fun_name = cost_name + suffix_name
 
-    cost_jac_expr = transpose(jacobian(cost_expr, vertcat(u, x)))
-
-    nls_cost_fun = Function( fun_name, [x, u, p], \
-            [ cost_expr, cost_jac_expr ])
+    cost_jac_exp = jacobian(cost_exp, vertcat(u, x))
+    
+    nls_cost_fun = Function( fun_name, [x, u], \
+            [ cost_exp, cost_jac_exp ])
 
     # generate C code
     if not os.path.exists('c_generated_code'):
         os.mkdir('c_generated_code')
 
     os.chdir('c_generated_code')
-    gen_dir = cost_name + '_cost'
+    gen_dir = cost_name + suffix_name 
     if not os.path.exists(gen_dir):
         os.mkdir(gen_dir)
     gen_dir_location = './' + gen_dir
@@ -81,7 +75,7 @@ def generate_c_code_nls_cost( model, cost_name, is_terminal ):
     file_name = cost_name + suffix_name
 
     nls_cost_fun.generate( file_name, casadi_opts )
-
+    
     os.chdir('../..')
     return
 

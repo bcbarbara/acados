@@ -52,9 +52,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     char fun_name[20] = "ocp_set";
     char buffer [400]; // for error messages
 
-    int min_nrhs = 4;
+
     /* RHS */
-    const mxArray *C_ocp = prhs[0];
+    const mxArray *matlab_model = prhs[0];
+    const mxArray *C_ocp = prhs[2];
     // plan
     ptr = (long long *) mxGetData( mxGetField( C_ocp, 0, "plan" ) );
     ocp_nlp_plan *plan = (ocp_nlp_plan *) ptr[0];
@@ -77,16 +78,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     ptr = (long long *) mxGetData( mxGetField( C_ocp, 0, "solver" ) );
     ocp_nlp_solver *solver = (ocp_nlp_solver *) ptr[0];
 
-    const mxArray *C_ext_fun_pointers = prhs[1];
+    const mxArray *C_ext_fun_pointers = prhs[3];
     // field
-    char *field = mxArrayToString( prhs[2] );
+    char *field = mxArrayToString( prhs[4] );
     // value
-    double *value = mxGetPr( prhs[3] );
+    double *value = mxGetPr( prhs[5] );
 
     // for checks
-    int matlab_size = (int) mxGetNumberOfElements( prhs[3] );
-    int nrow = (int) mxGetM( prhs[3] );
-    int ncol = (int) mxGetN( prhs[3] );
+    int matlab_size = (int) mxGetNumberOfElements( prhs[5] );
+    int nrow = (int) mxGetM( prhs[5] );
+    int ncol = (int) mxGetN( prhs[5] );
 
     // mexPrintf("\nocp_set: %s, matlab_size %d\n", field, matlab_size);
 
@@ -96,14 +97,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // stage
     int s0, se;
-    if (nrhs==min_nrhs)
+    if (nrhs==6)
     {
         s0 = 0;
         se = N;
     }
-    else if (nrhs==min_nrhs+1)
+    else if (nrhs==7)
     {
-        s0 = mxGetScalar( prhs[4] );
+        s0 = mxGetScalar( prhs[6] );
         if (s0 > N)
         {
             sprintf(buffer, "ocp_set: N < specified stage = %d\n", s0);
@@ -334,7 +335,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // initializations
     else if (!strcmp(field, "init_x"))
     {
-        if (nrhs!=min_nrhs)
+        if (nrhs!=6)
             MEX_SETTER_NO_STAGE_SUPPORT(fun_name, field)
 
         acados_size = (N+1) * nx;
@@ -346,7 +347,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
     else if (!strcmp(field, "init_u"))
     {
-        if (nrhs!=min_nrhs)
+        if (nrhs!=6)
             MEX_SETTER_NO_STAGE_SUPPORT(fun_name, field)
 
         acados_size = N*nu;
@@ -363,7 +364,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (type == IRK)
         {
             int nz = ocp_nlp_dims_get_from_attr(config, dims, out, 0, "z");
-            if (nrhs!=min_nrhs)
+            if (nrhs!=6)
                 MEX_SETTER_NO_STAGE_SUPPORT(fun_name, field)
 
             acados_size = N*nz;
@@ -385,7 +386,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (type == IRK)
         {
             int nx = ocp_nlp_dims_get_from_attr(config, dims, out, 0, "x");
-            if (nrhs!=min_nrhs)
+            if (nrhs!=6)
                 MEX_SETTER_NO_STAGE_SUPPORT(fun_name, field)
 
             acados_size = N*nx;
@@ -406,9 +407,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         sim_solver_t type = sim_plan.sim_solver;
         if (type == GNSF)
         {
-            int nout = ocp_nlp_dims_get_from_attr(config, dims, out, 0, "init_gnsf_phi");
-
-            if (nrhs!=min_nrhs)
+            // int nx = ocp_nlp_dims_get_from_attr(config, dims, out, 0, "x");
+            int nout = mxGetScalar( mxGetField( matlab_model, 0, "dim_gnsf_nout" ) );
+            if (nrhs!=6)
                 MEX_SETTER_NO_STAGE_SUPPORT(fun_name, field)
 
             acados_size = N*nout;
@@ -425,7 +426,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
     else if (!strcmp(field, "init_pi"))
     {
-        if (nrhs!=min_nrhs)
+        if (nrhs!=6)
             MEX_SETTER_NO_STAGE_SUPPORT(fun_name, field)
 
         acados_size = N*nx;
@@ -456,7 +457,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 // mexPrintf("ocp_set p: jj %d ext_fun_param_ptr %p \n", jj, ext_fun_param_ptr);
                 if (ext_fun_param_ptr!=0)
                 {
-                    if (nrhs==min_nrhs)
+                    if (nrhs==6)
                     {
                         for (int kk=0; kk<NN[jj]; kk++)
                         {
@@ -465,9 +466,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                             (ext_fun_param_ptr+kk)->set_param(ext_fun_param_ptr+kk, value);
                         }
                     }
-                    else if (nrhs==min_nrhs+1)
+                    else if (nrhs==7)
                     {
-                        int stage = mxGetScalar( prhs[4] );
+                        int stage = mxGetScalar( prhs[6] );
                         if (stage>=Nf_sum & stage<Nf_sum+NN[jj])
                         {
                             acados_size = (ext_fun_param_ptr+stage)->np;
@@ -501,20 +502,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         int warm_start_first_qp = (int) value[0];
         ocp_nlp_solver_opts_set(config, opts, "warm_start_first_qp", &warm_start_first_qp);
     }
-    else if (!strcmp(field, "print_level"))
-    {
-        acados_size = 1;
-        MEX_DIM_CHECK_VEC(fun_name, field, matlab_size, acados_size);
-        int print_level = (int) value[0];
-        ocp_nlp_solver_opts_set(config, opts, "print_level", &print_level);
-    }
     else
     {
         MEX_FIELD_NOT_SUPPORTED_SUGGEST(fun_name, field, "p, constr_x0,\
  constr_lbx, constr_ubx, constr_C, constr_D, constr_lg, constr_ug, cost_y_ref[_e],\
  cost_Vu, cost_Vx, cost_Vz, cost_W, cost_Z, cost_Zl, cost_Zu, cost_z,\
  cost_zl, cost_zu, init_x, init_u, init_z, init_xdot, init_gnsf_phi,\
- init_pi, nlp_solver_max_iter, qp_warm_start, warm_start_first_qp, print_level");
+ init_pi, nlp_solver_max_iter, qp_warm_start, warm_start_first_qp");
     }
 
     return;
