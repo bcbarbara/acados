@@ -1,4 +1,7 @@
-# Compiled source #
+interfaces/acados_template/examples/python/
+examples/acados_python/quadrotors_sensitivities/
+
+#Compiled source #
 ###################
 *.com
 *.class
